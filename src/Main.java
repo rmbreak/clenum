@@ -117,12 +117,14 @@ class CLEnum {
             clGetDeviceIDs(platform.getPlatformID(), CL_DEVICE_TYPE_ALL, null, ndevices);
             CLDevice[] devices = new CLDevice[ndevices.get()];
 
-            PointerBuffer devices_buffer = stack.mallocPointer(devices.length);
-            clGetDeviceIDs(platform.getPlatformID(), CL_DEVICE_TYPE_ALL, devices_buffer, (IntBuffer)null);
+            if (devices.length > 0) {
+                PointerBuffer devices_buffer = stack.mallocPointer(devices.length);
+                clGetDeviceIDs(platform.getPlatformID(), CL_DEVICE_TYPE_ALL, devices_buffer, (IntBuffer)null);
 
-            for (int i = 0; i < devices_buffer.capacity(); i++) {
-                long device = devices_buffer.get(i);
-                devices[i] = new CLDevice(device);
+                for (int i = 0; i < devices_buffer.capacity(); i++) {
+                    long device = devices_buffer.get(i);
+                    devices[i] = new CLDevice(device);
+                }
             }
 
             return devices;
