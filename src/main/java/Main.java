@@ -2,7 +2,10 @@ import org.lwjgl.*;
 import org.lwjgl.opencl.*;
 import org.lwjgl.system.*;
 
+import java.io.File;
+import java.io.IOException;
 import java.nio.*;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -18,6 +21,7 @@ class CLDevice {
     private final String DEVICE_VERSION;
     private final String DRIVER_VERSION;
     private final long DEVICE_MAX_COMPUTE_UNITS;
+    private final long DEVICE_TYPE;
 
     public CLDevice(long device) {
         this.device_id = device;
@@ -25,6 +29,15 @@ class CLDevice {
         this.DEVICE_VERSION = getDeviceInfoStringUTF8(device, CL_DEVICE_VERSION);
         this.DRIVER_VERSION = getDeviceInfoStringUTF8(device, CL_DRIVER_VERSION);
         this.DEVICE_MAX_COMPUTE_UNITS = getDeviceInfoInt(device, CL_DEVICE_MAX_COMPUTE_UNITS) & 0xffffffffL;
+        this.DEVICE_TYPE = getDeviceInfoLong(device, CL_DEVICE_TYPE);
+    }
+
+    public boolean compileSource(String source) {
+        throw new UnsupportedOperationException();
+    }
+
+    public boolean isGPU() {
+        return (this.DEVICE_TYPE & CL_DEVICE_TYPE_GPU) != 0;
     }
 
     public String toString() {
@@ -133,7 +146,17 @@ class CLEnum {
 }
 
 public class Main {
-    public static void main(String args[]) {
+    public static String readKernelSource(String filename) throws IOException {
+        ClassLoader classLoader = ClassLoader.getSystemClassLoader();
+        File file = new File(classLoader.getResource("kernel/" + filename).getFile());
+        return new String(Files.readAllBytes(file.toPath()));
+    }
+
+    public static void main(String args[]) throws IOException {
+        String sourcecode = readKernelSource("add.cl");
+        // Device to run opencl program on
+        Optional<CLDevice> gpuDevice = Optional.empty();
+
         CLPlatform[] platforms = CLEnum.getPlatforms();
         for (CLPlatform platform : platforms) {
             System.out.print(platform);
@@ -145,8 +168,16 @@ public class Main {
                     .map(line -> String.format("    %s", line))
                     .reduce("", (s, n) -> s + n + "\n");
                 System.out.print(deviceString);
+
+                if (device.isGPU()) {
+                    gpuDevice = Optional.of(device);
+                }
             }
             System.out.println();
+        }
+
+        if (gpuDevice.isPresent()) {
+            gpuDevice.get().compileSource(sourcecode);
         }
     }
 }
