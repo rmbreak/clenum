@@ -21,6 +21,9 @@ class CLDevice {
     private final String DEVICE_VERSION;
     private final String DRIVER_VERSION;
     private final long DEVICE_MAX_COMPUTE_UNITS;
+    private final long DEVICE_GLOBAL_MEM_SIZE;
+    private final long DEVICE_GLOBAL_MEM_CACHE_SIZE;
+    private final long DEVICE_MAX_CLOCK_FREQUENCY;
     private final long DEVICE_TYPE;
 
     public CLDevice(long device) {
@@ -29,6 +32,9 @@ class CLDevice {
         this.DEVICE_VERSION = getDeviceInfoStringUTF8(device, CL_DEVICE_VERSION);
         this.DRIVER_VERSION = getDeviceInfoStringUTF8(device, CL_DRIVER_VERSION);
         this.DEVICE_MAX_COMPUTE_UNITS = getDeviceInfoInt(device, CL_DEVICE_MAX_COMPUTE_UNITS) & 0xffffffffL;
+        this.DEVICE_GLOBAL_MEM_SIZE = getDeviceInfoLong(device, CL_DEVICE_GLOBAL_MEM_SIZE);
+        this.DEVICE_GLOBAL_MEM_CACHE_SIZE = getDeviceInfoLong(device, CL_DEVICE_GLOBAL_MEM_CACHE_SIZE);
+        this.DEVICE_MAX_CLOCK_FREQUENCY = getDeviceInfoInt(device, CL_DEVICE_MAX_CLOCK_FREQUENCY) & 0xffffffffL;
         this.DEVICE_TYPE = getDeviceInfoLong(device, CL_DEVICE_TYPE);
     }
 
@@ -48,6 +54,9 @@ class CLDevice {
         sb.append(String.format("  Version          : %s\n", DEVICE_VERSION));
         sb.append(String.format("  Driver Version   : %s\n", DRIVER_VERSION));
         sb.append(String.format("  Max Compute Units: %s\n", DEVICE_MAX_COMPUTE_UNITS));
+        sb.append(String.format("  Max Memory       : %s MB\n", DEVICE_GLOBAL_MEM_SIZE / 1024 / 1024));
+        sb.append(String.format("  Max Memory Cache : %s KB\n", DEVICE_GLOBAL_MEM_CACHE_SIZE / 1024));
+        sb.append(String.format("  Max Clock Freq   : %s MHz\n", DEVICE_MAX_CLOCK_FREQUENCY));
 
         return sb.toString();
     }
@@ -174,6 +183,7 @@ public class Main {
                 }
             }
             System.out.println();
+            System.out.flush();
         }
 
         if (gpuDevice.isPresent()) {
