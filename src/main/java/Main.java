@@ -14,10 +14,43 @@ import static org.lwjgl.opencl.CL10.*;
 import static org.lwjgl.opencl.InfoUtil.*;
 import static org.lwjgl.opencl.KHRICD.*;
 import static org.lwjgl.system.MemoryStack.*;
+import static org.lwjgl.system.MemoryUtil.*;
 
 class CLProgram {
+    public enum CompileResult {
+        SUCCESS(CL_SUCCESS),
+        INVALID_PROGRAM(CL_INVALID_PROGRAM),
+        INVALID_VALUE(CL_INVALID_VALUE),
+        INVALID_DEVICE(CL_INVALID_DEVICE),
+        INVALID_BINARY(CL_INVALID_BINARY),
+        INVALID_BUILD_OPTIONS(CL_INVALID_BUILD_OPTIONS),
+        INVALID_OPERATION(CL_INVALID_OPERATION),
+        COMPILER_NOT_AVAILABLE(CL_COMPILER_NOT_AVAILABLE),
+        BUILD_PROGRAM_FAILURE(CL_BUILD_PROGRAM_FAILURE),
+        OUT_OF_HOST_MEMORY(CL_OUT_OF_HOST_MEMORY);
+
+        private CompileResult(int result) {}
+
+        public static CompileResult fromInt(int result) {
+            switch (result) {
+                case CL_SUCCESS: return SUCCESS;
+                case CL_INVALID_PROGRAM: return INVALID_PROGRAM;
+                case CL_INVALID_VALUE: return INVALID_VALUE;
+                case CL_INVALID_DEVICE: return INVALID_DEVICE;
+                case CL_INVALID_BINARY: return INVALID_BINARY;
+                case CL_INVALID_BUILD_OPTIONS: return INVALID_BUILD_OPTIONS;
+                case CL_INVALID_OPERATION: return INVALID_OPERATION;
+                case CL_COMPILER_NOT_AVAILABLE: return COMPILER_NOT_AVAILABLE;
+                case CL_BUILD_PROGRAM_FAILURE: return BUILD_PROGRAM_FAILURE;
+                case CL_OUT_OF_HOST_MEMORY: return OUT_OF_HOST_MEMORY;
+                default: throw new IllegalArgumentException();
+            }
+        }
+    }
+
     private final long program;
     private final CLContext context;
+    private boolean compiled = false;
 
     private CLProgram(long program, CLContext context) {
         this.program = program;
@@ -33,6 +66,15 @@ class CLProgram {
         }
 
         return program;
+    }
+
+    public CompileResult compile() {
+        StringBuilder options = new StringBuilder("");
+        CompileResult result = CompileResult.fromInt(clBuildProgram(program, context.getDevice().getDeviceID(), options, null, NULL));
+        if (result == CompileResult.SUCCESS) {
+            this.compiled = true;
+        }
+        return result;
     }
 
     public String toString() {
@@ -56,12 +98,16 @@ class CLContext {
             ctxProps.put(0, CL_CONTEXT_PLATFORM)
                     .put(1, device.getPlatformID())
                     .put(2, 0);
-            context = clCreateContext(ctxProps, device.getDeviceID(), null, 0, null);
+            context = clCreateContext(ctxProps, device.getDeviceID(), null, NULL, null);
         }
     }
 
     public long getContextID() {
         return context;
+    }
+
+    public CLDevice getDevice() {
+        return this.device;
     }
 
     public String toString() {
@@ -230,7 +276,12 @@ public class Main {
         CLContext context = new CLContext(device);
         Optional<CLProgram> program = CLProgram.createFromSource(context, source);
         if (program.isPresent()) {
-            System.out.println(program);
+            CLProgram.CompileResult result =  program.get().compile();
+            if (result == CLProgram.CompileResult.SUCCESS) {
+                // TODO: setup command queue, create buffers, then finally call the kernel!
+            } else {
+                System.err.println("Failed to compile program");
+            }
         } else {
             System.err.println("Failed to create program from source");
         }
