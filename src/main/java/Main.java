@@ -15,6 +15,35 @@ import static org.lwjgl.opencl.InfoUtil.*;
 import static org.lwjgl.opencl.KHRICD.*;
 import static org.lwjgl.system.MemoryStack.*;
 
+class CLProgram {
+    private final long program;
+    private final CLContext context;
+
+    private CLProgram(long program, CLContext context) {
+        this.program = program;
+        this.context = context;
+    }
+
+    public static Optional<CLProgram> createFromSource(CLContext context, String source) {
+        Optional<CLProgram> program = Optional.empty();
+
+        long program_id = clCreateProgramWithSource(context.getContextID(), source, null);
+        if (program_id != 0) {
+            program = Optional.of(new CLProgram(program_id, context));
+        }
+
+        return program;
+    }
+
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append(String.format("Program [0x%x]", program));
+
+        return sb.toString();
+    }
+}
+
 class CLContext {
     private final long context;
     private final CLDevice device;
@@ -31,11 +60,15 @@ class CLContext {
         }
     }
 
+    public long getContextID() {
+        return context;
+    }
+
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
         sb.append(String.format("Context [0x%x]\n", context));
-        sb.append(String.format("  Device [0x%x]\n", device.getDeviceID()));
+        sb.append(String.format("  Device [0x%x]", device.getDeviceID()));
 
         return sb.toString();
     }
@@ -88,7 +121,7 @@ class CLDevice {
         sb.append(String.format("  Max Compute Units: %s\n", DEVICE_MAX_COMPUTE_UNITS));
         sb.append(String.format("  Max Memory       : %s MB\n", DEVICE_GLOBAL_MEM_SIZE / 1024 / 1024));
         sb.append(String.format("  Max Memory Cache : %s KB\n", DEVICE_GLOBAL_MEM_CACHE_SIZE / 1024));
-        sb.append(String.format("  Max Clock Freq   : %s MHz\n", DEVICE_MAX_CLOCK_FREQUENCY));
+        sb.append(String.format("  Max Clock Freq   : %s MHz", DEVICE_MAX_CLOCK_FREQUENCY));
 
         return sb.toString();
     }
@@ -137,7 +170,7 @@ class CLPlatform {
                 .reduce("", (s, ext) -> s + ext + "\n");
         sb.append(extensions);
         if (PLATFORM_ICD_SUFFIX_KHR.isPresent()) {
-            sb.append(String.format("  ICD Suffix KHR: %s\n", PLATFORM_ICD_SUFFIX_KHR));
+            sb.append(String.format("  ICD Suffix KHR: %s", PLATFORM_ICD_SUFFIX_KHR));
         }
 
         return sb.toString();
@@ -195,8 +228,12 @@ public class Main {
 
     public static void demoRunVADD(CLDevice device, String source) {
         CLContext context = new CLContext(device);
-
-        System.out.println(context);
+        Optional<CLProgram> program = CLProgram.createFromSource(context, source);
+        if (program.isPresent()) {
+            System.out.println(program);
+        } else {
+            System.err.println("Failed to create program from source");
+        }
     }
 
     public static void main(String args[]) throws IOException {
