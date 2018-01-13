@@ -16,7 +16,7 @@ import static org.lwjgl.opencl.KHRICD.*;
 import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
-class CLProgram {
+abstract class CLProgram {
     public enum CompileResult {
         SUCCESS(CL_SUCCESS),
         INVALID_PROGRAM(CL_INVALID_PROGRAM),
@@ -48,34 +48,30 @@ class CLProgram {
         }
     }
 
-    private final long program;
     private final CLContext context;
-    private boolean compiled = false;
+    private long program = 0;
 
-    private CLProgram(long program, CLContext context) {
-        this.program = program;
+    // TODO throw custom exception
+    public CLProgram(CLContext context) throws Exception {
         this.context = context;
-    }
 
-    public static Optional<CLProgram> createFromSource(CLContext context, String source) {
-        Optional<CLProgram> program = Optional.empty();
-
+        String source = getSource();
         long program_id = clCreateProgramWithSource(context.getContextID(), source, null);
         if (program_id != 0) {
-            program = Optional.of(new CLProgram(program_id, context));
-        }
+            program = program_id;
 
-        return program;
+            StringBuilder options = new StringBuilder("");
+            CompileResult result = CompileResult.fromInt(clBuildProgram(program, context.getDevice().getDeviceID(), options, null, NULL));
+            if (result != CompileResult.SUCCESS) {
+                // TODO throw custom exception wrapping CompileResult
+            }
+        } else {
+            // TODO throw custom exception
+            throw new Exception("Failed to create program.");
+        }
     }
 
-    public CompileResult compile() {
-        StringBuilder options = new StringBuilder("");
-        CompileResult result = CompileResult.fromInt(clBuildProgram(program, context.getDevice().getDeviceID(), options, null, NULL));
-        if (result == CompileResult.SUCCESS) {
-            this.compiled = true;
-        }
-        return result;
-    }
+    protected abstract String getSource();
 
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -83,6 +79,25 @@ class CLProgram {
         sb.append(String.format("Program [0x%x]", program));
 
         return sb.toString();
+    }
+}
+
+class VecAddProgram extends CLProgram {
+    VecAddProgram(CLContext context) throws Exception {
+        super(context);
+    }
+
+    @Override
+    protected String getSource() {
+        try {
+            return Main.readKernelSource("add.cl");
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    public int[] vadd(int a[], int b[]) {
+        throw new UnsupportedOperationException("Not implemented.");
     }
 }
 
@@ -272,23 +287,17 @@ public class Main {
         return new String(Files.readAllBytes(file.toPath()));
     }
 
-    public static void demoRunVADD(CLDevice device, String source) {
-        CLContext context = new CLContext(device);
-        Optional<CLProgram> program = CLProgram.createFromSource(context, source);
-        if (program.isPresent()) {
-            CLProgram.CompileResult result =  program.get().compile();
-            if (result == CLProgram.CompileResult.SUCCESS) {
-                // TODO: setup command queue, create buffers, then finally call the kernel!
-            } else {
-                System.err.println("Failed to compile program");
-            }
-        } else {
-            System.err.println("Failed to create program from source");
+    public static void demoRunVADD(CLDevice device) {
+        try {
+            CLContext context = new CLContext(device);
+            CLProgram program = new VecAddProgram(context);
+            // TODO: setup command queue, create buffers, then finally call the kernel!
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
-    public static void main(String args[]) throws IOException {
-        String sourcecode = readKernelSource("add.cl");
+    public static void main(String args[]) {
         // Device to run opencl program on
         Optional<CLDevice> gpuDevice = Optional.empty();
 
@@ -313,7 +322,7 @@ public class Main {
         }
 
         if (gpuDevice.isPresent()) {
-            demoRunVADD(gpuDevice.get(), sourcecode);
+            demoRunVADD(gpuDevice.get());
         } else {
             System.err.println("No OpenCL compatible GPU found.");
         }
