@@ -1,10 +1,17 @@
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.Random;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import opencl.*;
+import opencl.CLContext;
+import opencl.CLDevice;
+import opencl.CLEnum;
+import opencl.CLPlatform;
+import opencl.CLProgram;
 
 class VecAddProgram extends CLProgram {
     VecAddProgram(CLContext context) throws Exception {
@@ -33,10 +40,19 @@ public class Main {
     }
 
     public static void demoRunVADD(CLDevice device) {
+        Random rand = new Random();
+        int a[] = IntStream.range(0, 10240).map(__ -> rand.nextInt(500)).toArray();
+        int b[] = IntStream.range(0, 10240).map(__ -> rand.nextInt(500)).toArray();
+        int c_cpu[] = new int[10240];
+        for (int i = 0; i < a.length; i++) {
+            c_cpu[i] = a[i] + b[i];
+        }
+
         try {
             CLContext context = new CLContext(device);
-            CLProgram program = new VecAddProgram(context);
-            // TODO: setup command queue, create buffers, then finally call the kernel!
+            VecAddProgram program = new VecAddProgram(context);
+            int c_gpu[] = program.vadd(a, b);
+            assert(Arrays.equals(c_cpu, c_gpu));
         } catch (Exception e) {
             e.printStackTrace();
         }
