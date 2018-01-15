@@ -46,8 +46,8 @@ abstract public class CLProgram {
         }
     }
 
-    private final CLContext context;
-    private long program = 0;
+    protected final CLContext context;
+    protected long program = 0;
 
     // TODO throw custom exception
     public CLProgram(CLContext context) throws Exception {
