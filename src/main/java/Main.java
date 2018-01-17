@@ -55,14 +55,10 @@ class VecAddProgram extends CLProgram {
         clSetKernelArg1p(this.clKernelVADD, 1, bClBuffer);
         clSetKernelArg1p(this.clKernelVADD, 2, cClBuffer);
 
-        long localSize = 64;
-        long globalSize = (long)Math.ceil(a.length/localSize)*localSize;
-        PointerBuffer localSizeBuffer = BufferUtils.createPointerBuffer(1);
         PointerBuffer globalSizeBuffer = BufferUtils.createPointerBuffer(1);
-        localSizeBuffer.put(localSize).flip();
-        globalSizeBuffer.put(globalSize).flip();
+        globalSizeBuffer.put(a.length).flip();
 
-        clEnqueueNDRangeKernel(queue, clKernelVADD, 1, null, globalSizeBuffer, localSizeBuffer, null, null);
+        clEnqueueNDRangeKernel(queue, clKernelVADD, 1, null, globalSizeBuffer, null, null, null);
         clEnqueueReadBuffer(queue, cClBuffer, true, 0, cBuffer, null, null);
         clFinish(queue);
 
@@ -93,8 +89,6 @@ public class Main {
             CLContext context = new CLContext(device);
             VecAddProgram program = new VecAddProgram(context);
             int c_gpu[] = program.vadd(a, b);
-            c_gpu[0] = -1;
-            System.out.println("c_gpu[0] = " + c_gpu[0]);
 
             if (Arrays.equals(c_cpu, c_gpu)) {
                 System.out.println("GPU vector addition succeeded");
