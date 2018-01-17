@@ -1,18 +1,9 @@
 package opencl;
 
-import static org.lwjgl.opencl.CL10.CL_BUILD_PROGRAM_FAILURE;
-import static org.lwjgl.opencl.CL10.CL_COMPILER_NOT_AVAILABLE;
-import static org.lwjgl.opencl.CL10.CL_INVALID_BINARY;
-import static org.lwjgl.opencl.CL10.CL_INVALID_BUILD_OPTIONS;
-import static org.lwjgl.opencl.CL10.CL_INVALID_DEVICE;
-import static org.lwjgl.opencl.CL10.CL_INVALID_OPERATION;
-import static org.lwjgl.opencl.CL10.CL_INVALID_PROGRAM;
-import static org.lwjgl.opencl.CL10.CL_INVALID_VALUE;
-import static org.lwjgl.opencl.CL10.CL_OUT_OF_HOST_MEMORY;
-import static org.lwjgl.opencl.CL10.CL_SUCCESS;
-import static org.lwjgl.opencl.CL10.clBuildProgram;
-import static org.lwjgl.opencl.CL10.clCreateProgramWithSource;
+import static org.lwjgl.opencl.CL10.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
+
+import java.nio.IntBuffer;
 
 abstract public class CLProgram {
     public enum CompileResult {
@@ -47,21 +38,22 @@ abstract public class CLProgram {
     }
 
     protected final CLContext context;
-    protected long program = 0;
+    protected long program;
+    protected long queue;
 
     // TODO throw custom exception
     public CLProgram(CLContext context) throws Exception {
         this.context = context;
 
         String source = getSource();
-        long program_id = clCreateProgramWithSource(context.getContextID(), source, null);
-        if (program_id != 0) {
-            program = program_id;
-
+        this.program = clCreateProgramWithSource(context.getContextID(), source, null);
+        if (this.program != 0) {
             StringBuilder options = new StringBuilder("");
             CompileResult result = CompileResult.fromInt(clBuildProgram(program, context.getDevice().getDeviceID(), options, null, NULL));
             if (result != CompileResult.SUCCESS) {
                 // TODO throw custom exception wrapping CompileResult
+            } else {
+                this.queue = clCreateCommandQueue(context.getContextID(), context.getDevice().getDeviceID(), 0, (IntBuffer)null);
             }
         } else {
             // TODO throw custom exception

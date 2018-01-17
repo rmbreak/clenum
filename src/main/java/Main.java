@@ -1,5 +1,6 @@
 import java.io.File;
 import java.io.IOException;
+import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Optional;
@@ -13,9 +14,18 @@ import opencl.CLEnum;
 import opencl.CLPlatform;
 import opencl.CLProgram;
 
+import org.lwjgl.BufferUtils;
+import org.lwjgl.PointerBuffer;
+
+import static org.lwjgl.opencl.CL10.*;
+
 class VecAddProgram extends CLProgram {
+    private long clKernelVADD;
+
     VecAddProgram(CLContext context) throws Exception {
         super(context);
+
+        clKernelVADD = clCreateKernel(this.program, "vadd", (IntBuffer)null);
     }
 
     @Override
@@ -23,12 +33,43 @@ class VecAddProgram extends CLProgram {
         try {
             return Main.readKernelSource("add.cl");
         } catch (IOException e) {
-            return "";
+            throw new RuntimeException(e);
         }
     }
 
     public int[] vadd(int a[], int b[]) {
-        throw new UnsupportedOperationException("Not implemented.");
+        assert(a.length == b.length);
+
+        IntBuffer aBuffer = BufferUtils.createIntBuffer(a.length).put(a);
+        IntBuffer bBuffer = BufferUtils.createIntBuffer(b.length).put(b);
+        IntBuffer cBuffer = BufferUtils.createIntBuffer(a.length);
+        aBuffer.rewind();
+        bBuffer.rewind();
+
+        long aClBuffer = clCreateBuffer(this.context.getContextID(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, aBuffer, null);
+        long bClBuffer = clCreateBuffer(this.context.getContextID(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bBuffer, null);
+        long cClBuffer = clCreateBuffer(this.context.getContextID(), CL_MEM_WRITE_ONLY, 4*cBuffer.capacity(), null);
+        clFinish(queue);
+
+        clSetKernelArg1p(this.clKernelVADD, 0, aClBuffer);
+        clSetKernelArg1p(this.clKernelVADD, 1, bClBuffer);
+        clSetKernelArg1p(this.clKernelVADD, 2, cClBuffer);
+
+        long localSize = 64;
+        long globalSize = (long)Math.ceil(a.length/localSize)*localSize;
+        PointerBuffer localSizeBuffer = BufferUtils.createPointerBuffer(1);
+        PointerBuffer globalSizeBuffer = BufferUtils.createPointerBuffer(1);
+        localSizeBuffer.put(localSize).flip();
+        globalSizeBuffer.put(globalSize).flip();
+
+        clEnqueueNDRangeKernel(queue, clKernelVADD, 1, null, globalSizeBuffer, localSizeBuffer, null, null);
+        clEnqueueReadBuffer(queue, cClBuffer, true, 0, cBuffer, null, null);
+        clFinish(queue);
+
+        int c[] = new int[cBuffer.capacity()];
+        cBuffer.get(c);
+
+        return c;
     }
 }
 
@@ -52,7 +93,14 @@ public class Main {
             CLContext context = new CLContext(device);
             VecAddProgram program = new VecAddProgram(context);
             int c_gpu[] = program.vadd(a, b);
-            assert(Arrays.equals(c_cpu, c_gpu));
+            c_gpu[0] = -1;
+            System.out.println("c_gpu[0] = " + c_gpu[0]);
+
+            if (Arrays.equals(c_cpu, c_gpu)) {
+                System.out.println("GPU vector addition succeeded");
+            } else {
+                System.out.println("GPU vector addition failed");
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
