@@ -37,12 +37,21 @@ abstract public class CLProgram {
         }
     }
 
+    public class CLCompileException extends Exception {
+		private static final long serialVersionUID = 8395514257861157540L;
+		public CompileResult result;
+
+        public CLCompileException(CompileResult result) {
+            super(result.toString());
+            this.result = result;
+        }
+    }
+
     protected final CLContext context;
     protected long program;
     protected long queue;
 
-    // TODO throw custom exception
-    public CLProgram(CLContext context) throws Exception {
+    public CLProgram(CLContext context) throws CLCompileException,Exception {
         this.context = context;
 
         String source = getSource();
@@ -51,12 +60,11 @@ abstract public class CLProgram {
             StringBuilder options = new StringBuilder("");
             CompileResult result = CompileResult.fromInt(clBuildProgram(program, context.getDevice().getDeviceID(), options, null, NULL));
             if (result != CompileResult.SUCCESS) {
-                // TODO throw custom exception wrapping CompileResult
+                throw new CLCompileException(result);
             } else {
                 this.queue = clCreateCommandQueue(context.getContextID(), context.getDevice().getDeviceID(), 0, (IntBuffer)null);
             }
         } else {
-            // TODO throw custom exception
             throw new Exception("Failed to create program.");
         }
     }
